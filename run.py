@@ -118,7 +118,7 @@ async def monkey_loop():
     with open(json_loc, 'r') as r:
         servers_json = json.load(r)
     servers = servers_json.items()
-    print(f'{today_time:%Y-%m-%d %H:%M:%S}: Monkey sent!')
+    print_log("Monkey sent!")
     for s, c in servers:
         channel = bot.get_channel(c)
         await channel.send(file=discord.File(script_loc + '/monkey.mp4'))
