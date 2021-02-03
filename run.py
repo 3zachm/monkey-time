@@ -44,11 +44,18 @@ async def on_guild_join(guild):
     print_log("Joined \"" + guild.name + "\"")
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def set(ctx):
+    if ctx.guild is None:
+        guild_id = ctx.author.id
+        channel_id = 1
+    else:
+        guild_id = ctx.guild.id
+        channel_id = ctx.channel.id
+        if ctx.message.author.guild_permissions.administrator is not True:
+            return
     with open(json_loc, 'r') as r:
         servers_json = json.load(r)
-    servers_json[str(ctx.guild.id)] = ctx.channel.id
+    servers_json[str(guild_id)] = channel_id
     with open(json_loc, 'w') as w:
         json.dump(servers_json, w, indent=4)
     initial_c = 0xFF0000
@@ -68,12 +75,17 @@ async def set(ctx):
             await asyncio.sleep(1)
 
 @bot.command()
-@commands.has_permissions(administrator=True)
 async def remove(ctx):
+    if ctx.guild is None:
+        guild_id = ctx.author.id
+    else:
+        guild_id = ctx.guild.id
+        if ctx.message.author.guild_permissions.administrator is not True:
+            return
     with open(json_loc, 'r') as r:
         servers_json = json.load(r)
     try:
-        del servers_json[str(ctx.guild.id)]
+        del servers_json[str(guild_id)]
         embed=discord.Embed(
             title="monkey time stopped  🐒",
             description="monkey time has stopped in this server :(",
@@ -87,11 +99,7 @@ async def remove(ctx):
         )
     with open(json_loc, 'w') as w:
         json.dump(servers_json, w, indent=4)
-    await ctx.send(embed=discord.Embed(
-        title="monkey time stopped  🐒",
-        description="monkey time has stopped in this server :(",
-        color=0x000000
-    ))
+    await ctx.send(embed=embed)
 
 def print_log(str):
     print(f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}: ' + str)
@@ -104,7 +112,6 @@ async def monkey_loop():
     # wait until tomorrow at XX:XX:XX.XX
     t_time = [int(config.get('monkey time', 'hour')), int(config.get('monkey time', 'minute')), 0, 0] 
     today_time = datetime.datetime.now()
-    print_log("Waiting...")
     possible_today = today_time.replace(hour=t_time[0], minute=t_time[1], second=t_time[2], microsecond=t_time[3])
     # check if the target time is still within the current day, set next monkey accordingly
     if (possible_today - today_time).total_seconds() > 0:
@@ -118,9 +125,17 @@ async def monkey_loop():
     with open(json_loc, 'r') as r:
         servers_json = json.load(r)
     servers = servers_json.items()
-    print_log("Monkey sent!")
+    print_log("Sending monkeys...")
     for s, c in servers:
-        channel = bot.get_channel(c)
+        if c == 1:
+            member = await bot.fetch_user(s)
+            channel = await member.create_dm()
+            guild_name = str(member)
+        else:
+            channel = await bot.fetch_channel(c)
+            guild = await bot.fetch_guild(s)
+            guild_name = guild.name
         await channel.send(file=discord.File(script_loc + '/monkey.mp4'))
+        print_log("Sent to \"" + str(guild_name) + "\"")
 
 bot.run(bot_token)
