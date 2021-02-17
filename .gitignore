@@ -1,3 +1,7 @@
+/.pytest_cache
 /pytest_cache
 /config.ini
 /servers.json
+/.vscode
+!uploads/monkey.mp4
+uploads/*

@@ -3,6 +3,7 @@ import os
 import io
 import configparser
 import datetime
+import random
 
 import discord
 import json
@@ -125,7 +126,8 @@ async def monkey_loop():
     with open(json_loc, 'r') as r:
         servers_json = json.load(r)
     servers = servers_json.items()
-    print_log("Sending monkeys...")
+    video = random.choice(os.listdir(script_loc + "/uploads/"))
+    print_log("Sending " + video + "...")
     for s, c in servers:
         if c == 1:
             member = await bot.fetch_user(s)
@@ -135,7 +137,7 @@ async def monkey_loop():
             channel = await bot.fetch_channel(c)
             guild = await bot.fetch_guild(s)
             guild_name = guild.name
-        await channel.send(file=discord.File(script_loc + '/monkey.mp4'))
+        await channel.send(file=discord.File(script_loc + '/uploads/' + video))
         print_log("Sent to \"" + str(guild_name) + "\"")
 
 bot.run(bot_token)
