@@ -37,6 +37,7 @@ bot = commands.Bot(command_prefix="!monkey ")
 async def on_ready():
     print("\n")
     print_log("monkey time")
+    bot.last_video = None
     while True:
         await monkey_loop()
 
@@ -126,7 +127,10 @@ async def monkey_loop():
     with open(json_loc, 'r') as r:
         servers_json = json.load(r)
     servers = servers_json.items()
-    video = random.choice(os.listdir(script_loc + "/uploads/"))
+    while True:
+        video = random.choice(os.listdir(script_loc + "/uploads/"))
+        if bot.last_video != video:
+            break
     print_log("Sending " + video + "...")
     for s, c in servers:
         if c == 1:
