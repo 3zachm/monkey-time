@@ -131,6 +131,7 @@ async def monkey_loop():
         video = random.choice(os.listdir(script_loc + "/uploads/"))
         if bot.last_video != video:
             break
+    bot.last_video = video
     print_log("Sending " + video + "...")
     for s, c in servers:
         if c == 1:
