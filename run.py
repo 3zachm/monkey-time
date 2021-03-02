@@ -35,9 +35,13 @@ bot = commands.Bot(command_prefix="!monkey ")
 
 @bot.event
 async def on_ready():
+    if not hasattr(bot, 'appinfo'):
+        bot.appinfo = await bot.application_info()
     print("\n")
     print_log("monkey time")
     bot.last_video = None
+    bot.next_video = None
+    make_owners(script_loc + '/owners.json', bot)
     while True:
         await monkey_loop()
 
@@ -103,16 +107,47 @@ async def remove(ctx):
         json.dump(servers_json, w, indent=4)
     await ctx.send(embed=embed)
 
+def owner_check(ctx):
+    with open(script_loc + '/owners.json', 'r') as r:
+        owner_list = json.load(r)
+    for owner in owner_list['DISCORD_IDS']:
+        if owner['id'] == ctx.message.author.id:
+            return True
+    return False
+
+@bot.command()
+@commands.check(owner_check)
+async def override(ctx, *, video):
+    if os.path.exists(script_loc + "/uploads/" + video):
+        bot.next_video = video
+        await ctx.send("Set `bot.next_video` to `" + bot.next_video + "`")
+    else:
+        await ctx.send("`" + (script_loc + "/uploads/" + video) + "`" + " does not exist")
+
 def print_log(str):
     print(f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}: ' + str)
+
+def make_owners(path, bot):
+    if not os.path.exists(path):
+        ids = {"DISCORD_IDS": []}
+        discrim = str(bot.appinfo.owner).replace(str(bot.appinfo.owner.name) + "#", '')
+        ids["DISCORD_IDS"].append({"name": bot.appinfo.owner.name, "discrim": discrim, "id": bot.appinfo.owner.id})
+        with open(path, 'w') as w:
+            json.dump(ids, w, indent=4)
 
 async def wait_until(dt):
     now = datetime.datetime.now()
     await asyncio.sleep((dt - now).total_seconds())
 
 async def monkey_loop():
+    # get random video until it isn't the same as the last one
+    while True:
+        bot.next_video = random.choice(os.listdir(script_loc + "/uploads/"))
+        video = bot.next_video
+        if bot.last_video != video:
+            break
     # wait until tomorrow at XX:XX:XX.XX
-    t_time = [int(config.get('monkey time', 'hour')), int(config.get('monkey time', 'minute')), 0, 0] 
+    t_time = [int(config.get('monkey time', 'hour')), int(config.get('monkey time', 'minute')), 0, 0]
     today_time = datetime.datetime.now()
     possible_today = today_time.replace(hour=t_time[0], minute=t_time[1], second=t_time[2], microsecond=t_time[3])
     # check if the target time is still within the current day, set next monkey accordingly
@@ -123,14 +158,12 @@ async def monkey_loop():
         next_monkey = tomorrow.replace(hour=t_time[0], minute=t_time[1], second=t_time[2], microsecond=t_time[3])
     print_log(f'Next monkey will occur at {next_monkey:%Y-%m-%d %H:%M:%S}')
     await wait_until(next_monkey)
+    # if override command was used
+    video = bot.next_video
     # recursively send to all servers (ok for small scale, should use dedicated link ideally)
     with open(json_loc, 'r') as r:
         servers_json = json.load(r)
     servers = servers_json.items()
-    while True:
-        video = random.choice(os.listdir(script_loc + "/uploads/"))
-        if bot.last_video != video:
-            break
     bot.last_video = video
     print_log("Sending " + video + "...")
     for s, c in servers:
