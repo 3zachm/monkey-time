@@ -40,7 +40,7 @@ async def on_ready():
     print("\n")
     print_log("monkey time")
     bot.last_video = None
-    bot.next_video = None
+    bot.video_list = []
     make_owners(script_loc + '/owners.json', bot)
     while True:
         await monkey_loop()
@@ -117,12 +117,36 @@ def owner_check(ctx):
 
 @bot.command()
 @commands.check(owner_check)
-async def override(ctx, *, video):
+async def queue(ctx, *, video):
     if os.path.exists(script_loc + "/uploads/" + video):
-        bot.next_video = video
-        await ctx.send("Set `bot.next_video` to `" + bot.next_video + "`")
+        bot.video_list.append(video)
+        await ctx.send("Added `{0}` to the queue".format(video))
     else:
         await ctx.send("`" + (script_loc + "/uploads/" + video) + "`" + " does not exist")
+
+@bot.command()
+@commands.check(owner_check)
+async def cancel(ctx, index):
+    try:
+        index = int(index)
+        video = bot.video_list[index]
+        del bot.video_list[index]
+        await ctx.send("{0} was removed".format(video))
+    except IndexError:
+        await ctx.send("Index {0} doesn't exist".format(index))
+    except ValueError:
+        await ctx.send("{0} is not a valid integer".format(index))
+
+@bot.command()
+@commands.check(owner_check)
+async def list(ctx):
+    message = "```Current queue:\n\n"
+    count = 0
+    for video in bot.video_list:
+        message += "{0}. {1}\n".format(count, video)
+        count+= 1
+    message += "```"
+    await ctx.send(message)
 
 def print_log(str):
     print(f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}: ' + str)
@@ -141,11 +165,15 @@ async def wait_until(dt):
 
 async def monkey_loop():
     # get random video until it isn't the same as the last one
-    while True:
-        bot.next_video = random.choice(os.listdir(script_loc + "/uploads/"))
-        video = bot.next_video
-        if bot.last_video != video:
-            break
+    new_video = False
+    if len(bot.video_list) > 0:
+        video = bot.video_list[0]
+        new_video = True
+    while new_video is False:
+        new_video = random.choice(os.listdir(script_loc + "/uploads/"))
+        if bot.last_video != new_video:
+            bot.video_list.append(new_video)
+            new_video = True
     # wait until tomorrow at XX:XX:XX.XX
     t_time = [int(config.get('monkey time', 'hour')), int(config.get('monkey time', 'minute')), 0, 0]
     today_time = datetime.datetime.now()
@@ -158,14 +186,14 @@ async def monkey_loop():
         next_monkey = tomorrow.replace(hour=t_time[0], minute=t_time[1], second=t_time[2], microsecond=t_time[3])
     print_log(f'Next monkey will occur at {next_monkey:%Y-%m-%d %H:%M:%S}')
     await wait_until(next_monkey)
-    # if override command was used
-    video = bot.next_video
+    if bot.video_list == 0:
+        bot.video_list[0] = random.choice(os.listdir(script_loc + "/uploads/"))
     # recursively send to all servers (ok for small scale, should use dedicated link ideally)
     with open(json_loc, 'r') as r:
         servers_json = json.load(r)
     servers = servers_json.items()
-    bot.last_video = video
-    print_log("Sending " + video + "...")
+    bot.last_video = bot.video_list[0]
+    print_log("Sending " + bot.video_list[0] + "...")
     for s, c in servers:
         if c == 1:
             member = await bot.fetch_user(s)
@@ -175,7 +203,9 @@ async def monkey_loop():
             channel = await bot.fetch_channel(c)
             guild = await bot.fetch_guild(s)
             guild_name = guild.name
-        await channel.send(file=discord.File(script_loc + '/uploads/' + video))
+        await channel.send(file=discord.File(script_loc + '/uploads/' + bot.video_list[0]))
         print_log("Sent to \"" + str(guild_name) + "\"")
+    if len(bot.video_list) > 0:
+        del bot.video_list[0]
 
 bot.run(bot_token)
